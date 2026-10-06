@@ -1,0 +1,161 @@
+{% from '_macros.html' import avatar %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join the October Pushup Challenge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='welcome.css') }}">
+</head>
+<body>
+  <main>
+    <p class="eyebrow">{{ start.strftime('%b %-d') }} &ndash; {{ end.strftime('%b %-d, %Y') }}</p>
+    <h1>Pushup<br><span>Challenge</span></h1>
+
+    <form method="post" action="{{ url_for('join') }}" enctype="multipart/form-data" class="glass {% if not users %}no-users{% endif %}">
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+      {% if users %}
+      <div class="chips">
+        {% for u in users %}
+        <label class="chip">
+          <input type="radio" name="existing" value="{{ u['name'] }}">
+          <span class="chip-body">{{ avatar(u) }}<span class="chip-name">{{ u['name'] }}</span></span>
+        </label>
+        {% endfor %}
+        <label class="chip">
+          <input type="radio" name="existing" value="" id="choice-new">
+          <span class="chip-body new"><span class="avatar plus">+</span><span class="chip-name">I'm new</span></span>
+        </label>
+      </div>
+      {% endif %}
+
+      <div class="details">
+        <label class="field new-name">
+          <span>Your name</span>
+          <input name="name" maxlength="{{ max_name_len }}" autocomplete="name" placeholder="First name">
+        </label>
+
+        <div class="photo-row">
+          <label class="photo">
+            <input type="file" name="photo" accept="image/*" id="photo-input">
+            <span class="photo-circle" id="photo-preview">+</span>
+          </label>
+          <div>
+            <strong>Add a photo</strong>
+            <small>Optional &middot; shows next to your name</small>
+          </div>
+        </div>
+
+        <div class="cropper" id="cropper" hidden>
+          <div class="crop-view" id="crop-view" tabindex="0" role="group" aria-label="Photo crop area. Drag or use the arrow keys to move the photo.">
+            <img id="crop-img" alt="" draggable="false">
+          </div>
+          <label class="zoom">Zoom
+            <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
+          </label>
+          <small class="crop-hint">Drag to reposition</small>
+        </div>
+
+        <button type="submit">Enter the leaderboard</button>
+      </div>
+    </form>
+
+    {% if users %}<p class="count">{{ users|length }} {{ 'person' if users|length == 1 else 'people' }} already in</p>{% endif %}
+  </main>
+
+  <script>
+    (() => {
+      const input = document.getElementById('photo-input');
+      const preview = document.getElementById('photo-preview');
+      const cropper = document.getElementById('cropper');
+      const view = document.getElementById('crop-view');
+      const img = document.getElementById('crop-img');
+      const zoom = document.getElementById('zoom');
+      const OUT = 512;
+      let url = null, previewUrl = null, scheduled = false, drag = null;
+      let w = 0, h = 0, x = 0, y = 0, V = 0;
+
+      const scale = () => (V / Math.min(w, h)) * Number(zoom.value);
+
+      function render() {
+        const s = scale();
+        const mx = Math.max(0, (w * s - V) / 2), my = Math.max(0, (h * s - V) / 2);
+        x = Math.min(mx, Math.max(-mx, x));
+        y = Math.min(my, Math.max(-my, y));
+        img.style.width = w * s + 'px';
+        img.style.height = h * s + 'px';
+        img.style.transform = `translate(${V / 2 + x - (w * s) / 2}px, ${V / 2 + y - (h * s) / 2}px)`;
+        if (!scheduled) { scheduled = true; requestAnimationFrame(exportCrop); }
+      }
+
+      // Replace the chosen file with the cropped square so the server receives exactly what was framed.
+      function exportCrop() {
+        scheduled = false;
+        const s = scale(), k = OUT / V;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = OUT;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, OUT, OUT);
+        ctx.drawImage(img, (V / 2 + x - (w * s) / 2) * k, (V / 2 + y - (h * s) / 2) * k, w * s * k, h * s * k);
+        canvas.toBlob(blob => {
+          if (!blob) return;
+          const dt = new DataTransfer();
+          dt.items.add(new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
+          input.files = dt.files;
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
+          previewUrl = URL.createObjectURL(blob);
+          preview.textContent = '';
+          preview.style.backgroundImage = `url(${previewUrl})`;
+        }, 'image/jpeg', 0.9);
+      }
+
+      input.addEventListener('change', () => {
+        const file = input.files[0];
+        if (!file) { cropper.hidden = true; return; }
+        if (url) URL.revokeObjectURL(url);
+        url = URL.createObjectURL(file);
+        img.onload = () => {
+          w = img.naturalWidth;
+          h = img.naturalHeight;
+          cropper.hidden = false;
+          V = view.clientWidth;
+          x = y = 0;
+          zoom.value = 1;
+          render();
+        };
+        // Formats the browser can't decode skip cropping and are handled by the server.
+        img.onerror = () => { cropper.hidden = true; };
+        img.src = url;
+      });
+
+      view.addEventListener('pointerdown', e => {
+        drag = { px: e.clientX, py: e.clientY, x, y };
+        view.setPointerCapture(e.pointerId);
+      });
+      view.addEventListener('pointermove', e => {
+        if (!drag) return;
+        x = drag.x + e.clientX - drag.px;
+        y = drag.y + e.clientY - drag.py;
+        render();
+      });
+      ['pointerup', 'pointercancel'].forEach(t => view.addEventListener(t, () => { drag = null; }));
+      zoom.addEventListener('input', render);
+      view.addEventListener('wheel', e => {
+        e.preventDefault();
+        zoom.value = Math.min(3, Math.max(1, Number(zoom.value) - e.deltaY * 0.002));
+        render();
+      }, { passive: false });
+      view.addEventListener('keydown', e => {
+        const d = { ArrowLeft: [-10, 0], ArrowRight: [10, 0], ArrowUp: [0, -10], ArrowDown: [0, 10] }[e.key];
+        if (!d) return;
+        e.preventDefault();
+        x += d[0];
+        y += d[1];
+        render();
+      });
+    })();
+  </script>
+</body>
+</html>

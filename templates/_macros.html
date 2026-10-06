@@ -1,0 +1,4 @@
+{% macro avatar(u) -%}
+  {% if u['photo'] %}<img class="avatar" src="{{ url_for('photo', filename=u['photo']) }}" alt="">
+  {%- else %}<span class="avatar">{{ u['name'][:1]|upper }}</span>{% endif %}
+{%- endmacro %}

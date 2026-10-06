@@ -1,0 +1,132 @@
+{% from '_macros.html' import avatar %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>October Pushup Challenge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>October Pushup Challenge</h1>
+    <p class="dates">{{ start.strftime('%b %-d') }} &ndash; {{ end.strftime('%b %-d, %Y') }}</p>
+    <div class="stats">
+      <div class="stat"><strong>{{ rows|length }}</strong> participants</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="whoami">
+        {{ avatar(me) }}
+        <div><strong>{{ me['name'] }}</strong><br><a href="{{ url_for('switch') }}">Not you? / change photo</a></div>
+      </div>
+      <h2>Log your pushups</h2>
+      {% if error %}<p class="msg error">{{ error }}</p>{% endif %}
+      {% if notice %}<p class="msg ok">{{ notice }}</p>{% endif %}
+      {% if active %}
+      <form method="post" action="{{ url_for('log') }}">
+        <label>Date
+          <input name="day" type="date" min="{{ start.isoformat() }}" max="{{ max_day.isoformat() }}" required value="{{ form.get('day') or max_day.isoformat() }}">
+        </label>
+        <label>Pushups to add
+          <input name="count" type="number" min="1" max="{{ max_daily }}" step="1" inputmode="numeric" required value="{{ form.get('count', '') }}">
+        </label>
+        <button type="submit">Add</button>
+      </form>
+      <p class="hint">Each submission is added to that date's total, so you can log a set at a time or catch up on earlier days.</p>
+      {% else %}
+      <p class="empty">The challenge hasn't started yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Leaderboard</h2>
+      {% set top = rows[0]['total'] or 1 %}
+      <ol class="lanes">
+        {% for r in rows %}
+        <li class="lane{% if loop.index <= 3 and r['total'] > 0 %} r{{ loop.index }}{% endif %}{% if r['name'] == me['name'] %} me{% endif %}" style="--p: {{ (r['total'] / top)|round(3) }}">
+          <div class="plot">
+            <div class="trail"></div>
+            <div class="runner">
+              <span class="count">{{ '{:,}'.format(r['total']) }}</span>
+              <button type="button" class="avatar-btn" data-i="{{ loop.index0 }}" aria-label="Daily counts for {{ r['name'] }}">{{ avatar(r) }}</button>
+            </div>
+          </div>
+          <div class="name" title="{{ r['name'] }}">{{ r['name'] }}</div>
+        </li>
+        {% endfor %}
+      </ol>
+      <p class="hint">Tap a photo to see daily counts.</p>
+    </section>
+  </main>
+
+  <dialog id="person-dialog" aria-labelledby="pd-name">
+    <button type="button" class="pd-close" aria-label="Close">&times;</button>
+    <div class="pd-head">
+      <div id="pd-avatar"></div>
+      <div>
+        <h3 id="pd-name"></h3>
+        <p id="pd-summary"></p>
+      </div>
+    </div>
+    <ol class="pd-days" id="pd-days" tabindex="0" aria-label="Daily counts"></ol>
+  </dialog>
+
+  <script type="application/json" id="race-data">{{ {'people': people, 'days': days}|tojson }}</script>
+  <script>
+    (() => {
+      const data = JSON.parse(document.getElementById('race-data').textContent);
+      const dlg = document.getElementById('person-dialog');
+      const fmt = new Intl.NumberFormat('en-US');
+      const el = (tag, cls, text) => {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      };
+      const dayLabel = iso => new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+      function open(i) {
+        const p = data.people[i];
+        const counts = data.days.map(d => p.daily[d] || 0);
+        const best = Math.max(0, ...counts);
+        const logged = counts.filter(n => n > 0).length;
+
+        const av = document.getElementById('pd-avatar');
+        av.replaceChildren();
+        if (p.photo) {
+          const img = el('img', 'avatar');
+          img.src = p.photo;
+          img.alt = '';
+          av.append(img);
+        } else {
+          av.append(el('span', 'avatar', p.name.charAt(0).toUpperCase()));
+        }
+        document.getElementById('pd-name').textContent = p.name;
+        document.getElementById('pd-summary').textContent =
+          `${fmt.format(p.total)} total \u00b7 ${logged} day${logged === 1 ? '' : 's'} logged \u00b7 best ${fmt.format(best)}`;
+
+        const list = document.getElementById('pd-days');
+        list.replaceChildren();
+        for (let k = data.days.length - 1; k >= 0; k--) {
+          const li = el('li', counts[k] ? '' : 'zero');
+          const bar = el('span', 'pd-bar');
+          const fill = el('i');
+          fill.style.width = best ? (counts[k] / best * 100) + '%' : '0';
+          bar.append(fill);
+          li.append(el('span', 'pd-day', dayLabel(data.days[k])), bar, el('span', 'pd-n', fmt.format(counts[k])));
+          list.append(li);
+        }
+        dlg.showModal();
+        list.scrollTop = 0;
+      }
+
+      document.querySelectorAll('.avatar-btn').forEach(b => b.addEventListener('click', () => open(Number(b.dataset.i))));
+      dlg.querySelector('.pd-close').addEventListener('click', () => dlg.close());
+      dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+    })();
+  </script>
+</body>
+</html>

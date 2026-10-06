@@ -1,0 +1,15 @@
+services:
+  pushups:
+    build: .
+    ports:
+      - "80:8000"
+    environment:
+      TZ: America/New_York
+      CHALLENGE_START: "2026-10-01"
+      CHALLENGE_END: "2026-10-31"
+    volumes:
+      - pushup-data:/data
+    restart: unless-stopped
+
+volumes:
+  pushup-data:
