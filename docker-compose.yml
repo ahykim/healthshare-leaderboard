@@ -7,7 +7,7 @@ services:
       TZ: America/New_York
       CHALLENGE_START: "2026-10-01"
       CHALLENGE_END: "2026-10-31"
-    # DATABASE_URL, SUPABASE_URL and SUPABASE_KEY come from a .env file (see .env.example). Never commit it.
+    # POSTGRES_URL, SUPABASE_URL and SUPABASE_SECRET_KEY come from a .env file (see .env.example). Never commit it.
     env_file:
       - .env
     restart: unless-stopped

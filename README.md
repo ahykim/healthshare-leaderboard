@@ -13,7 +13,7 @@ python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Ac
 pip install -r requirements.txt
 
 npx supabase start        # first run pulls images; prints local URLs and keys
-cp .env.example .env      # then paste the local secret key from `supabase start` into SUPABASE_KEY
+cp .env.example .env      # then paste the local secret key from `supabase start` into SUPABASE_SECRET_KEY
 python app.py             # http://localhost:8000
 ```
 
@@ -41,6 +41,14 @@ docker compose up -d --build
 
 Edit `docker-compose.yml` to set `TZ` (determines what "today" means) and the challenge dates.
 
+## Deploy on Vercel
+
+The Supabase integration sets `POSTGRES_URL`, `SUPABASE_URL` and `SUPABASE_SECRET_KEY` on the Vercel project, which are exactly the names the app reads, so nothing else is needed. `.vercelignore` keeps your local `.env` out of CLI uploads. Those variables are scoped to the environments you selected in the integration (Production by default), so enable Preview/Development there if you deploy previews.
+
+```sh
+vercel --prod
+```
+
 ## Importing data from the old SQLite version
 
 Copy `pushups.db` and the `uploads/` folder off the old VM (they live in the `pushup-data` volume at `/data`), then:
@@ -56,9 +64,9 @@ It uses the same `.env` variables as the app, so run it against local first and 
 
 | Variable | Default |
 |---|---|
-| `DATABASE_URL` | required. Postgres connection string (use the Transaction pooler for hosted Supabase) |
+| `POSTGRES_URL` | required. Postgres connection string (use the Transaction pooler for hosted Supabase). A `supa=` query parameter, if present, is stripped |
 | `SUPABASE_URL` | required. Also used to build public photo URLs, so it must be reachable from browsers |
-| `SUPABASE_KEY` | required. Secret / `service_role` key, server-side only |
+| `SUPABASE_SECRET_KEY` | required. Secret key (`sb_secret_…`), server-side only |
 | `AVATAR_BUCKET` | `avatars` |
 | `CHALLENGE_START` | `2026-10-01` |
 | `CHALLENGE_END` | `2026-10-31` |

@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 from datetime import date
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, request, url_for
@@ -22,9 +23,16 @@ def require_env(name):
     return value
 
 
-DATABASE_URL = require_env("DATABASE_URL")
+def clean_postgres_url(url):
+    """The Vercel/Supabase integration can append a `supa=...` query param that libpq rejects."""
+    parts = urlsplit(url)
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query) if k != "supa"])
+    return urlunsplit(parts._replace(query=query))
+
+
+POSTGRES_URL = clean_postgres_url(require_env("POSTGRES_URL"))
 SUPABASE_URL = require_env("SUPABASE_URL").rstrip("/")
-SUPABASE_KEY = require_env("SUPABASE_KEY")
+SUPABASE_SECRET_KEY = require_env("SUPABASE_SECRET_KEY")
 AVATAR_BUCKET = os.environ.get("AVATAR_BUCKET", "avatars")
 START = date.fromisoformat(os.environ.get("CHALLENGE_START", "2026-10-01"))
 END = date.fromisoformat(os.environ.get("CHALLENGE_END", "2026-10-31"))
@@ -40,7 +48,7 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 
 # prepare_threshold=None: Supabase's transaction pooler doesn't support prepared statements.
 pool = ConnectionPool(
-    DATABASE_URL,
+    POSTGRES_URL,
     kwargs={"row_factory": dict_row, "prepare_threshold": None},
     min_size=1,
     max_size=5,
@@ -61,7 +69,7 @@ def get_db():
 def storage():
     global _supabase
     if _supabase is None:
-        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        _supabase = create_client(SUPABASE_URL, SUPABASE_SECRET_KEY)
     return _supabase.storage.from_(AVATAR_BUCKET)
 
 

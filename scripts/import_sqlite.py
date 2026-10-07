@@ -3,7 +3,7 @@
 Usage:
     python scripts/import_sqlite.py --sqlite path/to/pushups.db --uploads path/to/uploads [--dry-run] [--replace]
 
-Reads DATABASE_URL, SUPABASE_URL, SUPABASE_KEY (and optionally AVATAR_BUCKET) from the
+Reads POSTGRES_URL, SUPABASE_URL, SUPABASE_SECRET_KEY (and optionally AVATAR_BUCKET) from the
 environment or .env, so point those at local first, then at production.
 
 The import runs in a single transaction and checks row counts and per-person totals against
@@ -16,6 +16,7 @@ import os
 import sqlite3
 import sys
 from datetime import date, datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 import psycopg
@@ -25,6 +26,13 @@ from supabase import create_client
 
 def die(msg):
     sys.exit(f"error: {msg}")
+
+
+def clean_postgres_url(url):
+    """The Vercel/Supabase integration can append a `supa=...` query param that libpq rejects."""
+    parts = urlsplit(url)
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query) if k != "supa"])
+    return urlunsplit(parts._replace(query=query))
 
 
 def read_source(path):
@@ -60,9 +68,9 @@ def main():
     ap.add_argument("--replace", action="store_true", help="empty target users/pushups before importing")
     args = ap.parse_args()
 
-    db_url = os.environ.get("DATABASE_URL") or die("DATABASE_URL is not set")
+    db_url = clean_postgres_url(os.environ.get("POSTGRES_URL") or die("POSTGRES_URL is not set"))
     sb_url = (os.environ.get("SUPABASE_URL") or die("SUPABASE_URL is not set")).rstrip("/")
-    sb_key = os.environ.get("SUPABASE_KEY") or die("SUPABASE_KEY is not set")
+    sb_key = os.environ.get("SUPABASE_SECRET_KEY") or die("SUPABASE_SECRET_KEY is not set")
     bucket = os.environ.get("AVATAR_BUCKET", "avatars")
     tz = ZoneInfo(args.tz)
 
