@@ -9,7 +9,7 @@
 </head>
 <body>
   <main>
-    <p class="eyebrow">{{ start.strftime('%b %-d') }} &ndash; {{ end.strftime('%b %-d, %Y') }}</p>
+    <p class="eyebrow">{{ start.strftime('%b') }} {{ start.day }} &ndash; {{ end.strftime('%b') }} {{ end.day }}, {{ end.year }}</p>
     <h1>Pushup<br><span>Challenge</span></h1>
 
     <form method="post" action="{{ url_for('join') }}" enctype="multipart/form-data" class="glass {% if not users %}no-users{% endif %}">

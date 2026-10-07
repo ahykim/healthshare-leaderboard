@@ -10,7 +10,7 @@
 <body>
   <header>
     <h1>October Pushup Challenge</h1>
-    <p class="dates">{{ start.strftime('%b %-d') }} &ndash; {{ end.strftime('%b %-d, %Y') }}</p>
+    <p class="dates">{{ start.strftime('%b') }} {{ start.day }} &ndash; {{ end.strftime('%b') }} {{ end.day }}, {{ end.year }}</p>
     <div class="stats">
       <div class="stat"><strong>{{ rows|length }}</strong> participants</div>
     </div>
